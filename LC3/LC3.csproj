@@ -81,6 +81,7 @@
     </Compile>
     <Compile Include="Compiler\Instruction.cs" />
     <Compile Include="Compiler\LC3Compiler.cs" />
+    <Compile Include="GlobalSuppressions.cs" />
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>

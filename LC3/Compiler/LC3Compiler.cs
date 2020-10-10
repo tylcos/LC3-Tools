@@ -29,14 +29,21 @@ namespace LC3
             {
                 ["add"]  = (4, 0x1000),
                 ["and"]  = (4, 0x5000),
-                ["br"]   = (3, 0x5000),
+                ["br"]   = (3, 0x0000),
                 ["jmp"]  = (2, 0xC000),
+                ["jsr"]  = (2, 0x4000),
+                ["jsrr"] = (2, 0x4000),
+                ["ld"]   = (3, 0x2000),
+                ["ldi"]  = (3, 0xA000),
+                ["ldr"]  = (4, 0x6000),
+                ["lea"]  = (3, 0xE000),
+                ["not"]  = (3, 0x9000),
                 ["ret"]  = (1, 0xC000),
-                ["jsr"]  = (1, 0x4000),
-                ["jsrr"] = (1, 0x4000),
-                ["ld"]   = (1, 0x2000),
-                ["ldi"]  = (1, 0xA000),
-                ["ldr"]  = (1, 0x6000),
+                ["rti"]  = (1, 0x8000),
+                ["st"]   = (3, 0x3000),
+                ["sti"]  = (3, 0xB000),
+                ["str"]  = (4, 0x7000),
+                ["trap"] = (2, 0xF000),
             };
 
 
@@ -65,46 +72,55 @@ namespace LC3
                     continue;
 
                 
-
-
                 switch (opcode) 
                 {   
-                    case "add": // ADD r0 r0 r0
-                    case "and": // ADD r0 r0 0
+                    case "add":  // ADD r0 r0 r0
+                    case "and":  // ADD r0 r0 0
                         CurrentInstruction = parts[3][0] == 'r'
                             ? info.opcode + Register(1, 9) + Register(2, 6) + Register(3, 0)                           
                             : info.opcode + Register(1, 9) + Register(2, 6) + 0x0020 + Offset(3, 5);                   
                         break;
+                    case "not":  // NOT r0 r0
+                        CurrentInstruction = info.opcode + Register(1, 9) + Register(2, 6) + 0x003F;
+                        break;
 
-                    case "br": // BR nzp 0
+
+                            
+                    case "br":   // BR nzp 0
                         int conditions = (parts[1].Contains("n") ? 0x0800 : 0) +
                                          (parts[1].Contains("z") ? 0x0400 : 0) +
                                          (parts[1].Contains("p") ? 0x0200 : 0);
                         CurrentInstruction = info.opcode + conditions + Offset(2, 9);                                  
                         break;
-
-                    case "jmp": // JMP r0
+                    case "jmp":  // JMP r0
+                    case "jsrr": // JSRR r0
                         CurrentInstruction = info.opcode + Register(1, 6);                                             
                         break;
-                    case "ret": // RET
-                        CurrentInstruction = info.opcode + 0x01C0;                                                     
+                    case "ret":  // RET
+                        CurrentInstruction = info.opcode + 0x01C0;
                         break;
-
-                    case "JSR": // JSR 0
+                    case "rti":  // RTI
+                        CurrentInstruction = info.opcode;
+                        break;
+                    case "jsr":  // JSR 0
                         CurrentInstruction = info.opcode + 0x0800 + Offset(1, 11);
                         break;
-                    case "JSRR": // JSRR r0
-                        CurrentInstruction = info.opcode + Register(1, 6);
-                        break;
-
-                    case "LD": // JSR 0
-                        CurrentInstruction = info.opcode + 0x0800 + Offset(1, 11);
-                        break;
-                    case "LDI": // JSRR r0
-                        CurrentInstruction = info.opcode + Register(1, 6);
+                    case "trap": // TRAP 0
+                        CurrentInstruction = info.opcode + Offset(1, 8);
                         break;
 
 
+                    case "ld":   // LD r0 0
+                    case "ldi":  // LDI r0 0
+                    case "lda":  // LDA r0 0
+                    case "st":   // ST r0 0
+                    case "sti":  // STI r0 0
+                        CurrentInstruction = info.opcode + Register(1, 9) + Offset(2, 9);
+                        break;
+                    case "ldr":  // LDR r0 r0 0
+                    case "str":  // STR r0 r0 0
+                        CurrentInstruction = info.opcode + Register(1, 9) + Register(2, 6) + Offset(3, 6);
+                        break;
 
 
                     default:
