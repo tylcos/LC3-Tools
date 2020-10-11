@@ -1,6 +1,6 @@
 ﻿namespace LC3.Compiler
 {
-    readonly struct Instruction
+    record Instruction
     {
         public readonly short Bits;
 
