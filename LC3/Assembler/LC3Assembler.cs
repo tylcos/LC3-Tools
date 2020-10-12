@@ -8,9 +8,16 @@ namespace LC3
 {
     class LC3Assembler
     {
-        private int lineNum = -1;
-        private readonly List<(int, string)> errors = new List<(int line, string msg)>();
+        public List<(int, string)> Errors { get; } = new List<(int line, string msg)>();
+        public Dictionary<string, int> Labels { get; } = new();
 
+        private int lineNum = -1;
+
+
+        public LC3Assembler()
+        {
+        }
+            
 
         private static readonly Dictionary<string, (int argumentCount, int opcode)> InstructionInfo = new()
         {
@@ -43,9 +50,8 @@ namespace LC3
         public List<Instruction> Assemble(IEnumerable<string> lines)
         {
             var instructions = new List<Instruction>(32);
-            int CurrentInstruction = 0;
+            lineNum = -1;
 
-            string[] parts;
 
             
             foreach (string line in lines)
@@ -53,9 +59,10 @@ namespace LC3
                 lineNum++;
 
 
-                parts = line.ToLower().Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                string[] parts = line.ToLower().Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries);
                 if (parts.Length == 0)
                     continue;
+
 
                 string opcode = parts[0];
                 if (BadSyntaxCheck(!InstructionInfo.TryGetValue(opcode, out var info)
@@ -66,13 +73,17 @@ namespace LC3
 
 
                 // Fix for invalid BR syntax used in class, BRnzp 0 -> BR nzp 0
+                // and unconditional BR shortcut, BR 0 -> BR nzp 0
                 if (opcode.Substring(0, 2) == "br" && parts.Length == 2)
                 {
-                    parts = new string[] { "br", opcode.Substring(2), parts[1] };
+                    parts = opcode.Length == 2
+                        ? new string[] { "br", "nzp", parts[1] }
+                        : new string[] { "br", opcode.Substring(2), parts[1] };
                     opcode = "br";
                 }
 
 
+                int CurrentInstruction = 0;
                 switch (opcode)
                 {
                     case "add":  // ADD r0 r0 r0
@@ -181,11 +192,9 @@ namespace LC3
         private bool BadSyntaxCheck(bool check, string errorMsg)
         {
             if (check)
-                errors.Add((lineNum, errorMsg));
+                Errors.Add((lineNum, errorMsg));
 
             return check;
         }
-
-
     }
 }
