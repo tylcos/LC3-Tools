@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 
@@ -148,11 +149,25 @@ namespace LC3
 
             int Offset(int partNum, int length)
             {
-                BadSyntaxCheck(!int.TryParse(parts[partNum], out int offset), "Cannot parse offset: " + parts[partNum]);
-                if (BadSyntaxCheck(offset >= (1 << length), $"Offset '{offset}' to large to fit in {length} bits."))
+                int lengthMask = (1 << length) - 1;
+
+                string offsetString = parts[partNum];
+                int offset = 0;
+
+
+                if (offsetString[0] == 'x') // Hex prefix must be removed
+                    BadSyntaxCheck(!int.TryParse(offsetString.Substring(1), NumberStyles.HexNumber, null, out offset), 
+                        "Cannot parse offset: " + offsetString);
+                else
+                    BadSyntaxCheck(!int.TryParse(parts[partNum], out offset), "Cannot parse offset: " + offsetString);
+
+
+                //int validTest = offset < 0 ? ~offset & (lengthMask >> 1) : offset & (lengthMask >> 1);
+                bool withinRange = offset < 0 ? -offset <= (1 << (length - 1)) : offset <= (lengthMask >> 1);
+                if (BadSyntaxCheck(!withinRange, $"Offset '{offset}' to large to fit in {length} bits."))
                     return 0;
 
-                return offset & ((1 << length) - 1);
+                return offset & lengthMask;
             }
         }
 
@@ -170,5 +185,7 @@ namespace LC3
 
             return check;
         }
+
+
     }
 }

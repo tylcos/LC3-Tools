@@ -12,7 +12,7 @@ namespace LC3
 
 
         [Test]
-        public void TestMethod1()
+        public void TestAssembler()
         {
             string path = TestContext.CurrentContext.TestDirectory + @"\Tests\Data\";
 
