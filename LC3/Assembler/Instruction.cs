@@ -1,4 +1,4 @@
-﻿namespace LC3.Compiler
+﻿namespace LC3
 {
     record Instruction
     {
@@ -20,5 +20,8 @@
 
         public bool Get(int pos) => (Bits & (1 << pos)) != 0;
         public int GetRange(int length) => Bits & ((1 << length) - 1);
+
+
+        public override string ToString() => Bits.ToString("X4");
     }
 }

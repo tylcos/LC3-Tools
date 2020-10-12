@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-
-using LC3.Compiler;
-
+using System.Linq;
 
 namespace LC3
 {
@@ -31,26 +29,25 @@ namespace LC3
             ["st"]   = (3, 0x3000),
             ["sti"]  = (3, 0xB000),
             ["str"]  = (4, 0x7000),
-            ["trap"] = (2, 0xF000)
+            ["trap"] = (2, 0xF000),
+
+            // Pseudo-Ops
+            ["halt"] = (1, 0xF000)
         };
 
 
-        public static void Main()
-        {
-            var test = new LC3Assembler();
-            test.Assemble(@"test.txt");
-        }
+        public List<Instruction> Assemble(string path) => Assemble(File.ReadLines(path));
 
 
-        public void Assemble(string path)
+        public List<Instruction> Assemble(IEnumerable<string> lines)
         {
-            var instructions = new List<Instruction>();
+            var instructions = new List<Instruction>(32);
             int CurrentInstruction = 0;
 
             string[] parts;
 
-
-            foreach (string line in File.ReadLines(path))
+            
+            foreach (string line in lines)
             {
                 lineNum++;
 
@@ -60,7 +57,11 @@ namespace LC3
                     continue;
 
                 string opcode = parts[0];
-                var info = InstructionInfo[opcode];
+                if (BadSyntaxCheck(!InstructionInfo.TryGetValue(opcode, out var info)
+                        , $"Instruction '{opcode}' not recognized.") ||
+                    BadSyntaxCheck(parts.Length != info.argumentCount
+                        , $"Invalid {opcode.ToUpper()} instruciton, needs {info.argumentCount} arguments."))
+                    continue;
 
 
                 // Fix for invalid BR syntax used in class, BRnzp 0 -> BR nzp 0
@@ -70,15 +71,11 @@ namespace LC3
                     opcode = "br";
                 }
 
-                if (BadSyntaxCheck(parts.Length != info.argumentCount
-                    , $"Invalid {opcode.ToUpper()} instruciton, needs {info.argumentCount} arguments."))
-                    continue;
-
 
                 switch (opcode)
                 {
                     case "add":  // ADD r0 r0 r0
-                    case "and":  // ADD r0 r0 0
+                    case "and":  // AND r0 r0 0
                         CurrentInstruction = parts[3][0] == 'r'
                             ? info.opcode + Register(1, 9) + Register(2, 6) + Register(3, 0)
                             : info.opcode + Register(1, 9) + Register(2, 6) + 0x0020 + Offset(3, 5);
@@ -126,14 +123,17 @@ namespace LC3
                         break;
 
 
-                    default:
-                        BadSyntaxCheck(true, $"Instruction '{opcode}' not recognized.");
+                    case "halt":  // HALT
+                        CurrentInstruction = info.opcode + 0x0025;
                         break;
                 }
 
 
                 instructions.Add(new Instruction(CurrentInstruction));
             }
+
+
+            return instructions;
 
 
             int Register(int partNum, int offset = 0)
@@ -152,7 +152,7 @@ namespace LC3
                 if (BadSyntaxCheck(offset >= (1 << length), $"Offset '{offset}' to large to fit in {length} bits."))
                     return 0;
 
-                return offset;
+                return offset & ((1 << length) - 1);
             }
         }
 
