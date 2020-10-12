@@ -52,14 +52,16 @@ namespace LC3
             var instructions = new List<Instruction>(32);
             lineNum = -1;
 
+            string[] parts;
 
-            
+
+
             foreach (string line in lines)
             {
                 lineNum++;
 
 
-                string[] parts = line.ToLower().Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                parts = line.ToLower().Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries);
                 if (parts.Length == 0)
                     continue;
 
@@ -70,17 +72,6 @@ namespace LC3
                     BadSyntaxCheck(parts.Length != info.argumentCount
                         , $"Invalid {opcode.ToUpper()} instruciton, needs {info.argumentCount} arguments."))
                     continue;
-
-
-                // Fix for invalid BR syntax used in class, BRnzp 0 -> BR nzp 0
-                // and unconditional BR shortcut, BR 0 -> BR nzp 0
-                if (opcode.Substring(0, 2) == "br" && parts.Length == 2)
-                {
-                    parts = opcode.Length == 2
-                        ? new string[] { "br", "nzp", parts[1] }
-                        : new string[] { "br", opcode.Substring(2), parts[1] };
-                    opcode = "br";
-                }
 
 
                 int CurrentInstruction = 0;
@@ -98,10 +89,12 @@ namespace LC3
 
 
 
-                    case "br":   // BR nzp 0
-                        int conditions = (parts[1].Contains("n") ? 0x0800 : 0) +
-                                         (parts[1].Contains("z") ? 0x0400 : 0) +
-                                         (parts[1].Contains("p") ? 0x0200 : 0);
+                    case "br":   // BRnzp 0
+                        int conditions = 0x0E00;
+                        if (!parts[1].Contains("n")) conditions &= 0xF7FF;
+                        if (!parts[1].Contains("z")) conditions &= 0xFBFF;
+                        if (!parts[1].Contains("p")) conditions &= 0xFDFF;
+
                         CurrentInstruction = info.opcode + conditions + Offset(2, 9);
                         break;
                     case "jmp":  // JMP r0
