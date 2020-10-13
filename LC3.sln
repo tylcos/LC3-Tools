@@ -3,12 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.30524.135
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LC3", "LC3\LC3.csproj", "{580A7685-0395-4D44-80D4-605A682AD74F}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{E910FC27-AEC4-4DC5-9293-49F17D0AA6F9}"
-	ProjectSection(SolutionItems) = preProject
-		.editorconfig = .editorconfig
-	EndProjectSection
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LC3", "LC3.csproj", "{0E1CFB02-F9EE-47AE-A52D-1F9B81B62E4D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -18,19 +13,19 @@ Global
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{580A7685-0395-4D44-80D4-605A682AD74F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{580A7685-0395-4D44-80D4-605A682AD74F}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{580A7685-0395-4D44-80D4-605A682AD74F}.Debug|x64.ActiveCfg = test|x64
-		{580A7685-0395-4D44-80D4-605A682AD74F}.Debug|x64.Build.0 = test|x64
-		{580A7685-0395-4D44-80D4-605A682AD74F}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{580A7685-0395-4D44-80D4-605A682AD74F}.Release|Any CPU.Build.0 = Release|Any CPU
-		{580A7685-0395-4D44-80D4-605A682AD74F}.Release|x64.ActiveCfg = Release|x64
-		{580A7685-0395-4D44-80D4-605A682AD74F}.Release|x64.Build.0 = Release|x64
+		{0E1CFB02-F9EE-47AE-A52D-1F9B81B62E4D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0E1CFB02-F9EE-47AE-A52D-1F9B81B62E4D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0E1CFB02-F9EE-47AE-A52D-1F9B81B62E4D}.Debug|x64.ActiveCfg = Debug|x64
+		{0E1CFB02-F9EE-47AE-A52D-1F9B81B62E4D}.Debug|x64.Build.0 = Debug|x64
+		{0E1CFB02-F9EE-47AE-A52D-1F9B81B62E4D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0E1CFB02-F9EE-47AE-A52D-1F9B81B62E4D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0E1CFB02-F9EE-47AE-A52D-1F9B81B62E4D}.Release|x64.ActiveCfg = Release|x64
+		{0E1CFB02-F9EE-47AE-A52D-1F9B81B62E4D}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {99A41C0E-66C5-4473-BA6E-C514A45E31A7}
+		SolutionGuid = {A54E5ED2-40A2-492E-9FE4-A2298312972B}
 	EndGlobalSection
 EndGlobal

@@ -50,27 +50,20 @@ namespace LC3
         public List<Instruction> Assemble(IEnumerable<string> lines)
         {
             var instructions = new List<Instruction>(32);
+
             lineNum = -1;
 
-            string[] parts;
-
+            string[] parts = null;                                     // Current line split on delimiter
+            string opcode = "";                                        // Current opcode
+            (int argumentCount, int opcode) instructionInfo = default; // Info about current opcode
 
 
             foreach (string line in lines)
             {
                 lineNum++;
 
-
-                parts = line.ToLower().Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length == 0)
-                    continue;
-
-
-                string opcode = parts[0];
-                if (BadSyntaxCheck(!InstructionInfo.TryGetValue(opcode, out var info)
-                        , $"Instruction '{opcode}' not recognized.") ||
-                    BadSyntaxCheck(parts.Length != info.argumentCount
-                        , $"Invalid {opcode.ToUpper()} instruciton, needs {info.argumentCount} arguments."))
+                ParseLine(line);
+                if (parts == null)
                     continue;
 
 
@@ -80,38 +73,37 @@ namespace LC3
                     case "add":  // ADD r0 r0 r0
                     case "and":  // AND r0 r0 0
                         CurrentInstruction = parts[3][0] == 'r'
-                            ? info.opcode + Register(1, 9) + Register(2, 6) + Register(3, 0)
-                            : info.opcode + Register(1, 9) + Register(2, 6) + 0x0020 + Offset(3, 5);
+                            ? instructionInfo.opcode + Register(1, 9) + Register(2, 6) + Register(3, 0)
+                            : instructionInfo.opcode + Register(1, 9) + Register(2, 6) + 0x0020 + Offset(3, 5);
                         break;
                     case "not":  // NOT r0 r0
-                        CurrentInstruction = info.opcode + Register(1, 9) + Register(2, 6) + 0x003F;
+                        CurrentInstruction = instructionInfo.opcode + Register(1, 9) + Register(2, 6) + 0x003F;
                         break;
 
 
-
-                    case "br":   // BRnzp 0
+                    case "br":
                         int conditions = 0x0E00;
                         if (!parts[1].Contains("n")) conditions &= 0xF7FF;
                         if (!parts[1].Contains("z")) conditions &= 0xFBFF;
                         if (!parts[1].Contains("p")) conditions &= 0xFDFF;
 
-                        CurrentInstruction = info.opcode + conditions + Offset(2, 9);
+                        CurrentInstruction = instructionInfo.opcode + conditions + Offset(2, 9);
                         break;
                     case "jmp":  // JMP r0
                     case "jsrr": // JSRR r0
-                        CurrentInstruction = info.opcode + Register(1, 6);
+                        CurrentInstruction = instructionInfo.opcode + Register(1, 6);
                         break;
                     case "ret":  // RET
-                        CurrentInstruction = info.opcode + 0x01C0;
+                        CurrentInstruction = instructionInfo.opcode + 0x01C0;
                         break;
                     case "rti":  // RTI
-                        CurrentInstruction = info.opcode;
+                        CurrentInstruction = instructionInfo.opcode;
                         break;
                     case "jsr":  // JSR 0
-                        CurrentInstruction = info.opcode + 0x0800 + Offset(1, 11);
+                        CurrentInstruction = instructionInfo.opcode + 0x0800 + Offset(1, 11);
                         break;
                     case "trap": // TRAP 0
-                        CurrentInstruction = info.opcode + Offset(1, 8);
+                        CurrentInstruction = instructionInfo.opcode + Offset(1, 8);
                         break;
 
 
@@ -120,16 +112,16 @@ namespace LC3
                     case "lda":  // LDA r0 0
                     case "st":   // ST r0 0
                     case "sti":  // STI r0 0
-                        CurrentInstruction = info.opcode + Register(1, 9) + Offset(2, 9);
+                        CurrentInstruction = instructionInfo.opcode + Register(1, 9) + Offset(2, 9);
                         break;
                     case "ldr":  // LDR r0 r0 0
                     case "str":  // STR r0 r0 0
-                        CurrentInstruction = info.opcode + Register(1, 9) + Register(2, 6) + Offset(3, 6);
+                        CurrentInstruction = instructionInfo.opcode + Register(1, 9) + Register(2, 6) + Offset(3, 6);
                         break;
 
 
                     case "halt":  // HALT
-                        CurrentInstruction = info.opcode + 0x0025;
+                        CurrentInstruction = instructionInfo.opcode + 0x0025;
                         break;
                 }
 
@@ -140,6 +132,8 @@ namespace LC3
 
             return instructions;
 
+
+            int currentPC() => instructions.Count;
 
             int Register(int partNum, int offset = 0)
             {
@@ -153,27 +147,77 @@ namespace LC3
 
             int Offset(int partNum, int length)
             {
-                int lengthMask = (1 << length) - 1;
-
                 string offsetString = parts[partNum];
+
+
                 int offset = 0;
-
-
-                if (offsetString[0] == 'x') // Hex prefix must be removed
-                    BadSyntaxCheck(!int.TryParse(offsetString.Substring(1), NumberStyles.HexNumber, null, out offset), 
-                        "Cannot parse offset: " + offsetString);
+                // Hex
+                if (offsetString[0] == 'x')
+                {
+                    bool validOffset = int.TryParse(offsetString.Substring(1), NumberStyles.HexNumber, null, out offset);
+                    BadSyntaxCheck(!validOffset, "Cannot parse hex offset: " + offsetString);
+                }
+                // Decimal
+                else if (char.IsDigit(offsetString[0]) || offsetString[0] == '-') 
+                {
+                    bool validOffset = int.TryParse(parts[partNum], out offset);
+                    BadSyntaxCheck(!validOffset, "Cannot parse offset: " + offsetString);
+                }
+                // Label
+                else if (Labels.TryGetValue(offsetString, out int labelPos))
+                    offset = labelPos - currentPC();
                 else
-                    BadSyntaxCheck(!int.TryParse(parts[partNum], out offset), "Cannot parse offset: " + offsetString);
+                    BadSyntaxCheck(true, $"Label '{offsetString}' cannot be found.");
 
 
-                //int validTest = offset < 0 ? ~offset & (lengthMask >> 1) : offset & (lengthMask >> 1);
+                int lengthMask = (1 << length) - 1;
                 bool withinRange = offset < 0 ? -offset <= (1 << (length - 1)) : offset <= (lengthMask >> 1);
                 if (BadSyntaxCheck(!withinRange, $"Offset '{offset}' to large to fit in {length} bits."))
                     return 0;
 
                 return offset & lengthMask;
             }
+
+            // Overwrites parts, opcode, instructionInfo
+            void ParseLine(string line)
+            {
+                // Could make this far more efficient
+                string trimmedLine = line.ToLower().Split(new[] { ';' }, 1)[0];
+                parts = trimmedLine.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length == 0)
+                    return;
+
+                opcode = parts[0];
+
+
+                // Deal with BR instruction, BRnzp 0 -> BR nzp 0
+                if (opcode.Substring(0, 2) == "br")
+                {
+                    parts = opcode.Length == 2
+                        ? new string[] { "br", "nzp", parts[1] }
+                        : new string[] { "br", opcode.Substring(2), parts[1] };
+                    opcode = "br";
+                }
+
+
+                // Check for label before instruction
+                if (IsValidLabel(opcode, false))
+                {
+                    Labels.Add(opcode, currentPC());
+                    parts = parts.Skip(1).ToArray(); // Convert to range operator when possible
+                    opcode = parts[0];
+                }
+
+                // Check for valid instruction
+                if (BadSyntaxCheck(!InstructionInfo.TryGetValue(opcode, out instructionInfo), 
+                        $"Instruction '{opcode}' not recognized.")
+                    || BadSyntaxCheck(parts.Length != instructionInfo.argumentCount, 
+                        $"Invalid {opcode.ToUpper()} instruction, needs {instructionInfo.argumentCount} arguments."))
+                    parts = null;
+            }
         }
+
+
 
 
         /// <summary>
@@ -188,6 +232,14 @@ namespace LC3
                 Errors.Add((lineNum, errorMsg));
 
             return check;
+        }
+
+
+        private bool IsValidLabel(string label, bool isDeclared)
+        {
+            return label[0] != 'x' && !char.IsDigit(label[0])
+                && !InstructionInfo.ContainsKey(label)
+                && (isDeclared == Labels.ContainsKey(label));
         }
     }
 }
