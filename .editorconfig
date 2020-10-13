@@ -2,3 +2,6 @@
 
 # IDE0046: Convert to conditional expression
 dotnet_diagnostic.IDE0046.severity = none
+
+# CS0675: Bitwise-or operator used on a sign-extended operand
+dotnet_diagnostic.CS0675.severity = none

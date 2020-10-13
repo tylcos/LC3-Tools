@@ -1,8 +1,8 @@
 ﻿namespace LC3
 {
-    record Instruction
+    public record Instruction
     {
-        public readonly short Bits;
+        public short Bits;
 
 
         public Instruction(int bits)

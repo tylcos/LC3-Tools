@@ -8,8 +8,12 @@ namespace LC3
 {
     class LC3Assembler
     {
-        public List<(int, string)> Errors { get; } = new List<(int line, string msg)>();
-        public Dictionary<string, int> Labels { get; } = new();
+        public List<Instruction>               Instructions { get; private set; }
+        public List<(int line, string msg)>    Errors       { get; private set; }
+        public Dictionary<string, int>         Labels       { get; private set; }
+
+        private record LabelRefrence(int Line, int OffsetSize, string Label);
+        private List<LabelRefrence> LabelRefrences;
 
         private int lineNum = -1;
 
@@ -49,7 +53,10 @@ namespace LC3
 
         public List<Instruction> Assemble(IEnumerable<string> lines)
         {
-            var instructions = new List<Instruction>(32);
+            Instructions   = new(32);
+            Errors         = new();
+            Labels         = new();
+            LabelRefrences = new();
 
             lineNum = -1; 
 
@@ -125,28 +132,31 @@ namespace LC3
                 }
 
 
-                instructions.Add(new Instruction(CurrentInstruction));
+                Instructions.Add(new Instruction(CurrentInstruction));
             }
 
 
-            return instructions;
+            AssignLabelRefrences();
+
+            return Instructions;
 
 
-            int currentPC() => instructions.Count;
+            int currentPC() => Instructions.Count;
 
             int Register(int partNum, int offset = 0)
             {
                 int reg = parts[partNum][1] - '0';
 
-                if (BadSyntaxCheck(reg < 0 && reg > 7, "Invalid register number: " + parts[partNum]))
+                if (SyntaxErrorIf(reg < 0 && reg > 7, "Invalid register number: " + parts[partNum]))
                     return 0;
 
                 return reg << offset;
             }
 
-            int Offset(int partNum, int length)
+            int Offset(int partNum, int offsetSize)
             {
                 string offsetString = parts[partNum];
+                string label = "";
 
 
                 int offset = 0;
@@ -154,27 +164,26 @@ namespace LC3
                 if (offsetString[0] == 'x')
                 {
                     bool validOffset = int.TryParse(offsetString[1..], NumberStyles.HexNumber, null, out offset);
-                    BadSyntaxCheck(!validOffset, "Cannot parse hex offset: " + offsetString);
+                    SyntaxErrorIf(!validOffset, "Cannot parse hex offset: " + offsetString);
                 }
                 // Decimal
                 else if (char.IsDigit(offsetString[0]) || offsetString[0] == '-') 
                 {
                     bool validOffset = int.TryParse(parts[partNum], out offset);
-                    BadSyntaxCheck(!validOffset, "Cannot parse offset: " + offsetString);
+                    SyntaxErrorIf(!validOffset, "Cannot parse offset: " + offsetString);
                 }
-                // Label
-                else if (Labels.TryGetValue(offsetString, out int labelPos))
-                    offset = labelPos - currentPC();
+                // Known label 
+                else if (Labels.TryGetValue(offsetString, out int labelOffset))
+                {
+                    offset = labelOffset - currentPC() - 1;
+                    label = offsetString;
+                }
+                // Unknown label
                 else
-                    BadSyntaxCheck(true, $"Label '{offsetString}' cannot be found.");
+                    LabelRefrences.Add(new LabelRefrence(currentPC(), offsetSize, offsetString));
 
 
-                int lengthMask = (1 << length) - 1;
-                bool withinRange = offset < 0 ? -offset <= (1 << (length - 1)) : offset <= (lengthMask >> 1);
-                if (BadSyntaxCheck(!withinRange, $"Offset '{offset}' to large to fit in {length} bits."))
-                    return 0;
-
-                return offset & lengthMask;
+                return IsValidOffset(offset, offsetSize, label) ? offset & ((1 << offsetSize) - 1) : 0;
             }
 
             // Overwrites parts, opcode, instructionInfo
@@ -214,13 +223,31 @@ namespace LC3
                 }
 
                 // Check for valid instruction
-                if (BadSyntaxCheck(!InstructionInfo.TryGetValue(opcode, out instructionInfo), 
+                if (SyntaxErrorIf(!InstructionInfo.TryGetValue(opcode, out instructionInfo), 
                         $"Instruction '{opcode}' not recognized.")
-                    || BadSyntaxCheck(parts.Length != instructionInfo.argumentCount, 
+                    || SyntaxErrorIf(parts.Length != instructionInfo.argumentCount, 
                         $"Invalid {opcode.ToUpper()} instruction, needs {instructionInfo.argumentCount} arguments."))
                     return false;
 
                 return true;
+            }
+        }
+
+
+        private void AssignLabelRefrences()
+        {
+            foreach ((int line, int offsetSize, string label) in LabelRefrences)
+            {
+                if (SyntaxErrorIf(!Labels.TryGetValue(label, out int labelOffset), $"Label '{label}' cannot be found."))
+                    continue;
+
+                int offset = labelOffset - line - 1;
+                int sizeMask = (1 << offsetSize) - 1;
+
+                if (!IsValidOffset(offset, offsetSize, label))
+                    continue;
+
+                Instructions[line] = new Instruction(Instructions[line].Bits | (offset & sizeMask));
             }
         }
 
@@ -233,7 +260,7 @@ namespace LC3
         /// <param name="check">True for bad syntax. </param>
         /// <param name="errorMsg">Error message to be added if assertion is False. </param>
         /// <returns>True if error was added</returns>
-        private bool BadSyntaxCheck(bool check, string errorMsg)
+        private bool SyntaxErrorIf(bool check, string errorMsg)
         {
             if (check)
                 Errors.Add((lineNum, errorMsg));
@@ -247,6 +274,22 @@ namespace LC3
             return label.Length > 0 && label[0] != 'x' && !char.IsDigit(label[0])
                 && !InstructionInfo.ContainsKey(label)
                 && (isDeclared == Labels.ContainsKey(label));
+        }
+
+        public bool IsValidOffset(int offset, int offsetSize, string label = "")
+        {
+            int sizeMask = 1 << (offsetSize - 1);
+            bool valid = offset < 0 ? -offset <= sizeMask : offset < sizeMask;
+
+
+            int limit = offset < 0 ? -sizeMask : sizeMask - 1;
+            string errorMsg = label == ""
+                ? $"Offset '{offset}' cannot fit within {offsetSize} bits, the limit is {limit}."
+                : $"Offset for label '{label}' with value {offset} cannot fit within {offsetSize} bits, the limit is {limit}.";
+            SyntaxErrorIf(!valid, errorMsg);
+
+
+            return valid;
         }
     }
 }

@@ -23,10 +23,9 @@ namespace LC3
                 Console.WriteLine("Testing " + currentFile);
 
 
-                lc3a.Errors.Clear();
                 var program = lc3a.Assemble(currentFile).Select(i => i.ToString()).ToArray();
 
-                
+
                 Assert.IsEmpty(lc3a.Errors);
 
                 var expectedPath = path + Path.GetFileNameWithoutExtension(currentFile) + ".dat";
@@ -39,7 +38,6 @@ namespace LC3
         public void TestAssemblerSpecific()
         {
             // Offsets
-            lc3a.Errors.Clear();
             lc3a.Assemble(new List<string>()
             {
                 "TRAP -128",
@@ -50,20 +48,30 @@ namespace LC3
             Assert.IsEmpty(lc3a.Errors);
 
 
-            lc3a.Errors.Clear();
             lc3a.Assemble(new List<string>()
             {
                 "TRAP -129",
                 "TRAP 128"
             });
-            Assert.AreEqual(lc3a.Errors[0], (0, "Offset '-129' to large to fit in 8 bits."));
-            Assert.AreEqual(lc3a.Errors[1], (1, "Offset '128' to large to fit in 8 bits."));
-            Assert.AreEqual(lc3a.Errors, 2);
+            Assert.AreEqual(lc3a.Errors[0].line, 0);
+            Assert.AreEqual(lc3a.Errors[1].line, 1);
+            Assert.AreEqual(lc3a.Errors.Count, 2);
 
 
 
 
             // Labels
+        }
+
+        [Test]
+        public void TestAssemblerHelperMethods()
+        {
+            Assert.IsTrue(lc3a.IsValidOffset(0, 4));
+            Assert.IsTrue(lc3a.IsValidOffset(7, 4));
+            Assert.IsTrue(lc3a.IsValidOffset(-8, 4));
+
+            Assert.IsFalse(lc3a.IsValidOffset(8, 4));
+            Assert.IsFalse(lc3a.IsValidOffset(-9, 4));
         }
     }
 }
