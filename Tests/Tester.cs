@@ -44,19 +44,33 @@ namespace LC3
                 "TRAP -128",
                 "TRAP 127",
                 "TRAP x7F",
-                "TRAP 0"
-            });
-            Assert.IsEmpty(lc3a.Errors);
+                "TRAP 0",
 
-
-            lc3a.Assemble(new List<string>()
-            {
                 "TRAP -129",
                 "TRAP 128"
             });
-            Assert.AreEqual(lc3a.Errors.Count, 2);
-            Assert.AreEqual(lc3a.Errors[0].line, 0);
-            Assert.AreEqual(lc3a.Errors[1].line, 1);
+            Assert.AreEqual(2, lc3a.Errors.Count);
+            Assert.AreEqual(4, lc3a.Errors[0].line);
+            Assert.AreEqual(5, lc3a.Errors[1].line);
+
+
+
+
+            // Registers
+            lc3a.Errors.Clear();
+            lc3a.Assemble(new List<string>()
+            {
+                "ADD r0 r0 r0",
+                "ADD r7 r7 r7",
+
+                "ADD r r r",
+                "ADD r8 r8 r8",
+                "ADD r10 r10 r10"
+            });
+            Assert.AreEqual(9, lc3a.Errors.Count);
+            Assert.AreEqual(2, lc3a.Errors[0].line);
+            Assert.AreEqual(3, lc3a.Errors[3].line);
+            Assert.AreEqual(4, lc3a.Errors[6].line);
         }
 
         [Test]

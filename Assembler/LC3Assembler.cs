@@ -72,13 +72,13 @@ namespace LC3
             Labels          = new();
             LabelReferences = new();
 
-            lineNum = -1; 
 
             string[] parts = null;                                     // Current line split on delimiter
             string opcode = "";                                        // Current opcode
             (int argumentCount, int opcode) instructionInfo = default; // Info about current opcode
 
 
+            lineNum = -1;
             foreach (string line in lines)
             {
                 lineNum++;
@@ -179,9 +179,12 @@ namespace LC3
 
             int Register(int partNum, int offset = 0)
             {
-                int reg = parts[partNum][1] - '0';
+                string regString = parts[partNum];
+                if (SyntaxErrorIf(regString.Length != 2, $"Invalid register '{regString}', must be 2 characters."))
+                    return 0;
 
-                if (SyntaxErrorIf(reg < 0 && reg > 7, "Invalid register number: " + parts[partNum]))
+                int reg = regString[1] - '0';
+                if (SyntaxErrorIf(reg < 0 || reg > 7, $"Invalid register: '{regString}', must be in range r0 - r7."))
                     return 0;
 
                 return reg << offset;
