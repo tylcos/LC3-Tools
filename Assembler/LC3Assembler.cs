@@ -51,7 +51,7 @@ namespace LC3
         {
             var instructions = new List<Instruction>(32);
 
-            lineNum = -1;
+            lineNum = -1; 
 
             string[] parts = null;                                     // Current line split on delimiter
             string opcode = "";                                        // Current opcode
@@ -62,8 +62,7 @@ namespace LC3
             {
                 lineNum++;
 
-                ParseLine(line);
-                if (parts == null)
+                if (!ParseLine(line))
                     continue;
 
 
@@ -154,7 +153,7 @@ namespace LC3
                 // Hex
                 if (offsetString[0] == 'x')
                 {
-                    bool validOffset = int.TryParse(offsetString.Substring(1), NumberStyles.HexNumber, null, out offset);
+                    bool validOffset = int.TryParse(offsetString[1..], NumberStyles.HexNumber, null, out offset);
                     BadSyntaxCheck(!validOffset, "Cannot parse hex offset: " + offsetString);
                 }
                 // Decimal
@@ -179,23 +178,23 @@ namespace LC3
             }
 
             // Overwrites parts, opcode, instructionInfo
-            void ParseLine(string line)
+            bool ParseLine(string line)
             {
                 // Could make this far more efficient
-                string trimmedLine = line.ToLower().Split(new[] { ';' }, 1)[0];
+                string trimmedLine = line.Trim().ToLower().Split(new[] { ';' }, 1)[0];
+                if (trimmedLine.Length == 0)
+                    return false;
                 parts = trimmedLine.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length == 0)
-                    return;
 
                 opcode = parts[0];
 
 
                 // Deal with BR instruction, BRnzp 0 -> BR nzp 0
-                if (opcode.Substring(0, 2) == "br")
+                if (opcode[0..2] == "br")
                 {
                     parts = opcode.Length == 2
                         ? new string[] { "br", "nzp", parts[1] }
-                        : new string[] { "br", opcode.Substring(2), parts[1] };
+                        : new string[] { "br", opcode[2..], parts[1] };
                     opcode = "br";
                 }
 
@@ -204,8 +203,14 @@ namespace LC3
                 if (IsValidLabel(opcode, false))
                 {
                     Labels.Add(opcode, currentPC());
-                    parts = parts.Skip(1).ToArray(); // Convert to range operator when possible
-                    opcode = parts[0];
+
+                    if (parts.Length > 1) // LABEL BR 0
+                    {
+                        parts = parts[1..];
+                        opcode = parts[0];
+                    }
+                    else                  // LABEL
+                        return false;
                 }
 
                 // Check for valid instruction
@@ -213,7 +218,9 @@ namespace LC3
                         $"Instruction '{opcode}' not recognized.")
                     || BadSyntaxCheck(parts.Length != instructionInfo.argumentCount, 
                         $"Invalid {opcode.ToUpper()} instruction, needs {instructionInfo.argumentCount} arguments."))
-                    parts = null;
+                    return false;
+
+                return true;
             }
         }
 
@@ -237,7 +244,7 @@ namespace LC3
 
         private bool IsValidLabel(string label, bool isDeclared)
         {
-            return label[0] != 'x' && !char.IsDigit(label[0])
+            return label.Length > 0 && label[0] != 'x' && !char.IsDigit(label[0])
                 && !InstructionInfo.ContainsKey(label)
                 && (isDeclared == Labels.ContainsKey(label));
         }
