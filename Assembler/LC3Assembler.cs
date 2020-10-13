@@ -13,7 +13,7 @@ namespace LC3
         public Dictionary<string, int>         Labels       { get; private set; }
 
         private record LabelRefrence(int Line, int OffsetSize, string Label);
-        private List<LabelRefrence> LabelRefrences;
+        private List<LabelRefrence> LabelReferences;
 
         private int lineNum = -1;
 
@@ -44,19 +44,31 @@ namespace LC3
             ["trap"] = (2, 0xF000),
 
             // Pseudo-Ops
-            ["halt"] = (1, 0xF000)
+            ["halt"]     = (1, 0xF000),
+            [".fill"]    = (2, 0x0000),
+            [".blkw"]    = (2, 0x0000),
+            [".stringz"] = (2, 0x0000)
         };
 
 
         public List<Instruction> Assemble(string path) => Assemble(File.ReadLines(path));
 
 
+
+        /// <summary>
+        ///     Assembles the provided program without stopping for error.
+        ///    
+        ///     First  pass: Assembles all instructions and pseudo-ops. Creates symbol table in 'Labels' and adds any unrecognized labels to 'LabelReferences'.
+        ///     Second pass: Each reference in 'LabelReferences' is dereferenced by querying the symbol table.
+        /// </summary>
+        /// <param name="lines">Provided program</param>
+        /// <returns>Assembled program</returns>
         public List<Instruction> Assemble(IEnumerable<string> lines)
         {
             Instructions   = new(32);
             Errors         = new();
             Labels         = new();
-            LabelRefrences = new();
+            LabelReferences = new();
 
             lineNum = -1; 
 
@@ -116,6 +128,7 @@ namespace LC3
                     case "ld":   // LD r0 0
                     case "ldi":  // LDI r0 0
                     case "lda":  // LDA r0 0
+                    case "lea":  // LEA r0 0
                     case "st":   // ST r0 0
                     case "sti":  // STI r0 0
                         CurrentInstruction = instructionInfo.opcode + Register(1, 9) + Offset(2, 9);
@@ -129,6 +142,22 @@ namespace LC3
                     case "halt":  // HALT
                         CurrentInstruction = instructionInfo.opcode + 0x0025;
                         break;
+                    case ".fill":  // .FILL 0
+                        CurrentInstruction = Offset(1, 16);
+                        break;
+                    case ".blkw":  // .BLKW 1
+                        int length = Offset(1, 16, false);
+
+                        for (int i = 0; i < length; i++)
+                            Instructions.Add(Instruction.Empty);
+
+                        continue;
+                    case ".stringz":  // .STRINGZ "Hi" -> .stringz Hi
+                        foreach (char c in parts[1])
+                            Instructions.Add(new Instruction(Convert.ToInt32(c)));
+
+                        Instructions.Add(Instruction.Empty);
+                        continue;
                 }
 
 
@@ -153,7 +182,7 @@ namespace LC3
                 return reg << offset;
             }
 
-            int Offset(int partNum, int offsetSize)
+            int Offset(int partNum, int offsetSize, bool allowLabels = true)
             {
                 string offsetString = parts[partNum];
                 string label = "";
@@ -173,14 +202,17 @@ namespace LC3
                     SyntaxErrorIf(!validOffset, "Cannot parse offset: " + offsetString);
                 }
                 // Known label 
-                else if (Labels.TryGetValue(offsetString, out int labelOffset))
+                else if (allowLabels && Labels.TryGetValue(offsetString, out int labelPosition))
                 {
-                    offset = labelOffset - currentPC() - 1;
+                    offset = labelPosition - currentPC() - 1;
                     label = offsetString;
                 }
                 // Unknown label
-                else
-                    LabelRefrences.Add(new LabelRefrence(currentPC(), offsetSize, offsetString));
+                else if (allowLabels && IsValidLabel(offsetString))
+                {
+                    LabelReferences.Add(new LabelRefrence(currentPC(), offsetSize, offsetString));
+                    return 0;
+                }
 
 
                 return IsValidOffset(offset, offsetSize, label) ? offset & ((1 << offsetSize) - 1) : 0;
@@ -189,6 +221,18 @@ namespace LC3
             // Overwrites parts, opcode, instructionInfo
             bool ParseLine(string line)
             {
+                // Cannot trim line if it is a string instruction
+                if (line.Length > 10 && line[..8] == ".STRINGZ")
+                {
+                    parts = new []{ ".stringz", line[8..]};
+
+                    Range range = (parts[1].IndexOf("\"") + 1) .. parts[1].LastIndexOf("\"");
+                    parts[1] = parts[1][range];
+                    return true;
+                }
+                    
+
+
                 // Could make this far more efficient
                 string trimmedLine = line.Trim().ToLower().Split(new[] { ';' }, 1)[0];
                 if (trimmedLine.Length == 0)
@@ -199,7 +243,7 @@ namespace LC3
 
 
                 // Deal with BR instruction, BRnzp 0 -> BR nzp 0
-                if (opcode[0..2] == "br")
+                if (opcode[..2] == "br")
                 {
                     parts = opcode.Length == 2
                         ? new string[] { "br", "nzp", parts[1] }
@@ -209,7 +253,7 @@ namespace LC3
 
 
                 // Check for label before instruction
-                if (IsValidLabel(opcode, false))
+                if (IsValidLabel(opcode))
                 {
                     Labels.Add(opcode, currentPC());
 
@@ -236,12 +280,12 @@ namespace LC3
 
         private void AssignLabelRefrences()
         {
-            foreach ((int line, int offsetSize, string label) in LabelRefrences)
+            foreach ((int line, int offsetSize, string label) in LabelReferences)
             {
-                if (SyntaxErrorIf(!Labels.TryGetValue(label, out int labelOffset), $"Label '{label}' cannot be found."))
+                if (SyntaxErrorIf(!Labels.TryGetValue(label, out int labelPosition), $"Label '{label}' cannot be found."))
                     continue;
 
-                int offset = labelOffset - line - 1;
+                int offset = labelPosition - line - 1;
                 int sizeMask = (1 << offsetSize) - 1;
 
                 if (!IsValidOffset(offset, offsetSize, label))
@@ -269,14 +313,17 @@ namespace LC3
         }
 
 
-        private bool IsValidLabel(string label, bool isDeclared)
-        {
-            return label.Length > 0 && label[0] != 'x' && !char.IsDigit(label[0])
-                && !InstructionInfo.ContainsKey(label)
-                && (isDeclared == Labels.ContainsKey(label));
+        private bool IsValidLabel(string label)
+        { 
+            if (label.Length == 0 || InstructionInfo.ContainsKey(label)
+                || SyntaxErrorIf(Labels.TryGetValue(label, out int labelPos), $"Label '{label}' already declared on line {labelPos}.") 
+                || SyntaxErrorIf(label[0] == 'x' || char.IsDigit(label[0]),   $"Label '{label}' cannot start with 'x' or a digit."))
+                return false;
+
+            return true;
         }
 
-        public bool IsValidOffset(int offset, int offsetSize, string label = "")
+        private bool IsValidOffset(int offset, int offsetSize, string label = "")
         {
             int sizeMask = 1 << (offsetSize - 1);
             bool valid = offset < 0 ? -offset <= sizeMask : offset < sizeMask;

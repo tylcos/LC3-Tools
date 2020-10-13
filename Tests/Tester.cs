@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 
 using NUnit.Framework;
 
@@ -66,12 +67,18 @@ namespace LC3
         [Test]
         public void TestAssemblerHelperMethods()
         {
-            Assert.IsTrue(lc3a.IsValidOffset(0, 4));
-            Assert.IsTrue(lc3a.IsValidOffset(7, 4));
-            Assert.IsTrue(lc3a.IsValidOffset(-8, 4));
+            MethodInfo method1 = typeof(LC3Assembler).GetMethod("IsValidOffset", BindingFlags.NonPublic | BindingFlags.Instance);
 
-            Assert.IsFalse(lc3a.IsValidOffset(8, 4));
-            Assert.IsFalse(lc3a.IsValidOffset(-9, 4));
+
+            Assert.IsTrue(IsValidOffset(0, 4));
+            Assert.IsTrue(IsValidOffset(7, 4));
+            Assert.IsTrue(IsValidOffset(-8, 4));
+
+            Assert.IsFalse(IsValidOffset(8, 4));
+            Assert.IsFalse(IsValidOffset(-9, 4));
+
+
+            bool IsValidOffset(int offset, int offsetSize) => (bool) method1.Invoke(lc3a, new object[] { offset, offsetSize, "" });
         }
     }
 }
