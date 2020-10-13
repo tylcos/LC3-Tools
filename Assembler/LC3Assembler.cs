@@ -8,9 +8,9 @@ namespace LC3
 {
     class LC3Assembler
     {
-        public List<Instruction>               Instructions { get; private set; }
-        public List<(int line, string msg)>    Errors       { get; private set; }
-        public Dictionary<string, int>         Labels       { get; private set; }
+        public List<Instruction>               Instructions { get; private set; } = new();
+        public List<(int line, string msg)>    Errors       { get; private set; } = new();
+        public Dictionary<string, int>         Labels       { get; private set; } = new();
 
         private record LabelRefrence(int Line, int OffsetSize, string Label);
         private List<LabelRefrence> LabelReferences;
@@ -47,7 +47,9 @@ namespace LC3
             ["halt"]     = (1, 0xF000),
             [".fill"]    = (2, 0x0000),
             [".blkw"]    = (2, 0x0000),
-            [".stringz"] = (2, 0x0000)
+            [".stringz"] = (2, 0x0000),
+            [".orig"]    = (2, 0x0000),
+            [".end"]     = (1, 0x0000)
         };
 
 
@@ -56,7 +58,7 @@ namespace LC3
 
 
         /// <summary>
-        ///     Assembles the provided program without stopping for error.
+        ///     Assembles the provided program without stopping for errors.
         ///    
         ///     First  pass: Assembles all instructions and pseudo-ops. Creates symbol table in 'Labels' and adds any unrecognized labels to 'LabelReferences'.
         ///     Second pass: Each reference in 'LabelReferences' is dereferenced by querying the symbol table.
@@ -65,9 +67,9 @@ namespace LC3
         /// <returns>Assembled program</returns>
         public List<Instruction> Assemble(IEnumerable<string> lines)
         {
-            Instructions   = new(32);
-            Errors         = new();
-            Labels         = new();
+            Instructions    = new(32);
+            Errors          = new();
+            Labels          = new();
             LabelReferences = new();
 
             lineNum = -1; 
@@ -139,13 +141,13 @@ namespace LC3
                         break;
 
 
-                    case "halt":  // HALT
+                    case "halt":      // HALT
                         CurrentInstruction = instructionInfo.opcode + 0x0025;
                         break;
-                    case ".fill":  // .FILL 0
+                    case ".fill":     // .FILL 0
                         CurrentInstruction = Offset(1, 16);
                         break;
-                    case ".blkw":  // .BLKW 1
+                    case ".blkw":     // .BLKW 1
                         int length = Offset(1, 16, false);
 
                         for (int i = 0; i < length; i++)
@@ -157,6 +159,9 @@ namespace LC3
                             Instructions.Add(new Instruction(Convert.ToInt32(c)));
 
                         Instructions.Add(Instruction.Empty);
+                        continue;
+                    case ".orig":    // .ORIG x3000
+                    case ".end":     // .END
                         continue;
                 }
 
@@ -234,7 +239,7 @@ namespace LC3
 
 
                 // Could make this far more efficient
-                string trimmedLine = line.Trim().ToLower().Split(new[] { ';' }, 1)[0];
+                string trimmedLine = line.Trim().ToLower().Split(new[] { ';' }, 2)[0];
                 if (trimmedLine.Length == 0)
                     return false;
                 parts = trimmedLine.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries);
@@ -243,7 +248,7 @@ namespace LC3
 
 
                 // Deal with BR instruction, BRnzp 0 -> BR nzp 0
-                if (opcode[..2] == "br")
+                if (opcode.Length >= 2 && opcode[..2] == "br")
                 {
                     parts = opcode.Length == 2
                         ? new string[] { "br", "nzp", parts[1] }
@@ -265,6 +270,7 @@ namespace LC3
                     else                  // LABEL
                         return false;
                 }
+
 
                 // Check for valid instruction
                 if (SyntaxErrorIf(!InstructionInfo.TryGetValue(opcode, out instructionInfo), 
@@ -315,7 +321,7 @@ namespace LC3
 
         private bool IsValidLabel(string label)
         { 
-            if (label.Length == 0 || InstructionInfo.ContainsKey(label)
+            if (label.Length == 0 || InstructionInfo.ContainsKey(label.ToLower())
                 || SyntaxErrorIf(Labels.TryGetValue(label, out int labelPos), $"Label '{label}' already declared on line {labelPos}.") 
                 || SyntaxErrorIf(label[0] == 'x' || char.IsDigit(label[0]),   $"Label '{label}' cannot start with 'x' or a digit."))
                 return false;

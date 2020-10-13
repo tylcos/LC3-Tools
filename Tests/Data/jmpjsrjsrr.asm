@@ -1,3 +1,5 @@
+.orig x0000
+
 JSR MYLABEL
 LEA R2, MYLABEL2
 JSRR R2
@@ -19,3 +21,7 @@ AND R5, R5, 0
 ADD R5, R5, 8
 
 HALT
+
+.end
+
+;; R1: x0003, R2: x0008, R3: x0005, R4: x000B, R5: x0008
