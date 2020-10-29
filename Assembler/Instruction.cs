@@ -1,4 +1,8 @@
-﻿namespace LC3
+﻿using System;
+
+using LC3.Compiler;
+
+namespace LC3
 {
     record Instruction
     {

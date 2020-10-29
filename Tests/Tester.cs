@@ -4,6 +4,8 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 
+using LC3.Compiler;
+
 using NUnit.Framework;
 
 namespace LC3
@@ -103,6 +105,12 @@ namespace LC3
 
             bool IsValidOffset(int offset, int offsetSize) => (bool)method1.Invoke(lc3a, new object[] { offset, offsetSize, "" });
             bool IsValidLabel (string label)               => (bool)method2.Invoke(lc3a, new object[] { label });
+        }
+
+        [Test]
+        public void TestCompiler()
+        {
+            _ = new SimpleCompiler();
         }
     }
 }

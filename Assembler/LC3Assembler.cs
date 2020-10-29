@@ -44,12 +44,13 @@ namespace LC3
             ["trap"] = (2, 0xF000),
 
             // Pseudo-Ops
+            ["mov"]      = (3, 0x1000),
             ["halt"]     = (1, 0xF000),
-            [".fill"]    = (2, 0x0000),
-            [".blkw"]    = (2, 0x0000),
-            [".stringz"] = (2, 0x0000),
-            [".orig"]    = (2, 0x0000),
-            [".end"]     = (1, 0x0000)
+            [".fill"]    = (2, 0),
+            [".blkw"]    = (2, 0),
+            [".stringz"] = (2, 0),
+            [".orig"]    = (2, 0),
+            [".end"]     = (1, 0)
         };
 
 
@@ -141,6 +142,9 @@ namespace LC3
                         break;
 
 
+                    case "mov":       // MOV r0 r1 -> ADD r0 r1 0
+                        CurrentInstruction = instructionInfo.opcode + Register(1, 9) + Register(2, 6) + 0x0020;
+                        break;
                     case "halt":      // HALT
                         CurrentInstruction = instructionInfo.opcode + 0x0025;
                         break;
@@ -223,7 +227,7 @@ namespace LC3
                 }
 
 
-                return IsValidOffset(offset, offsetSize, label) ? offset & ((1 << offsetSize) - 1) : 0;
+                return IsValidOffset(offset, offsetSize, label, out int sizeMask) ? offset & sizeMask : 0;
             }
 
             // Overwrites parts, opcode, instructionInfo
@@ -295,9 +299,8 @@ namespace LC3
                     continue;
 
                 int offset = labelPosition - line - 1;
-                int sizeMask = (1 << offsetSize) - 1;
 
-                if (!IsValidOffset(offset, offsetSize, label))
+                if (!IsValidOffset(offset, offsetSize, label, out int sizeMask))
                     continue;
 
                 Instructions[line] = new Instruction(Instructions[line].Bits | (offset & sizeMask));
@@ -332,9 +335,9 @@ namespace LC3
             return true;
         }
 
-        private bool IsValidOffset(int offset, int offsetSize, string label = "")
+        private bool IsValidOffset(int offset, int offsetSize, string label, out int sizeMask)
         {
-            int sizeMask = 1 << (offsetSize - 1);
+            sizeMask = 1 << (offsetSize - 1);
             bool valid = offset < 0 ? -offset <= sizeMask : offset < sizeMask;
 
 
